@@ -32,9 +32,12 @@ keys = [
     Key([mod], "Space", lazy.spawn("rofi -show drun"), desc="rofi drun"),
     Key([mod], "Return", lazy.spawn(terminal), desc="terminal"),
     Key([mod], "e", lazy.spawn(filemanager), desc="file manager"),
-    Key([], "XF86AudioRaiseVolume", lazy.spawn("pactl set-sink-volume 0 +1%"), desc='Volume Up'),
-    Key([], "XF86AudioLowerVolume", lazy.spawn("pactl set-sink-volume 0 -1%"), desc='volume down'),
-    Key([], "XF86AudioMute", lazy.spawn("pactl set-sink-mute @DEFAULT_SINK@ toggle"), desc='Volume Mute'),
+    Key([], "XF86AudioRaiseVolume", lazy.spawn(
+        "pactl set-sink-volume 0 +1%"), desc='Volume Up'),
+    Key([], "XF86AudioLowerVolume", lazy.spawn(
+        "pactl set-sink-volume 0 -1%"), desc='volume down'),
+    Key([], "XF86AudioMute", lazy.spawn(
+        "pactl set-sink-mute @DEFAULT_SINK@ toggle"), desc='Volume Mute'),
 ]
 
 # layout
