@@ -1,0 +1,12 @@
+singleton Theme 1.0 Theme.qml
+singleton DwmState 1.0 DwmState.qml
+singleton PopupGuard 1.0 PopupGuard.qml
+singleton NotificationStore 1.0 NotificationStore.qml
+Bar 1.0 Bar.qml
+VolumeWidget 1.0 VolumeWidget.qml
+ClockWidget 1.0 ClockWidget.qml
+NotificationCenter 1.0 NotificationCenter.qml
+NotificationToasts 1.0 NotificationToasts.qml
+PowerMenu 1.0 PowerMenu.qml
+Launcher 1.0 Launcher.qml
+WallpaperPicker 1.0 WallpaperPicker.qml
