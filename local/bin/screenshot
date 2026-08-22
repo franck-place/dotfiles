@@ -1,0 +1,21 @@
+#!/bin/sh
+# Screenshot tool: full screen by default, or an interactive region select
+# with `screenshot region`. Saves to ~/Pictures/screenshots and fires a
+# themed notification through the quickshell notification center.
+
+shots_dir="$HOME/Pictures/screenshots"
+mkdir -p "$shots_dir"
+file="$shots_dir/$(date '+%Y-%m-%d_%H-%M-%S').png"
+
+case "$1" in
+	region) import "$file" ;;
+	*)      import -window root "$file" ;;
+esac
+
+[ -s "$file" ] || exit 1
+
+gdbus call --session --dest org.freedesktop.Notifications \
+	--object-path /org/freedesktop/Notifications \
+	--method org.freedesktop.Notifications.Notify \
+	"Screenshot" 0 "" "Screenshot saved" "$(basename "$file")" \
+	"[]" "{\"image-path\": <\"file://$file\">}" 5000 >/dev/null

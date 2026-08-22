@@ -1,0 +1,11 @@
+[Unit]
+Description=Quickshell dwm bar
+# Started/stopped explicitly from .xinitrc around the X session's lifetime --
+# there's no display-manager-driven graphical-session.target here to hook
+# into (dwm is launched via startx), so this unit isn't part of any target.
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/qs -p %h/.config/quickshell/dwmbar/shell.qml
+Restart=on-failure
+RestartSec=2

@@ -71,6 +71,8 @@ static const Key keys[] = {
 	{ MODKEY,                       XK_e,      spawn,          SHCMD("timeout 3 qs -p ~/.config/quickshell/dwmbar ipc call launcher toggle") },
 	{ MODKEY,                       XK_w,      spawn,          SHCMD("timeout 3 qs -p ~/.config/quickshell/dwmbar ipc call wallpaper toggle") },
 	{ MODKEY|ShiftMask,             XK_e,      spawn,          SHCMD("power-menu") },
+	{ 0,                            XK_Print,  spawn,          SHCMD("screenshot") },
+	{ ShiftMask,                    XK_Print,  spawn,          SHCMD("screenshot region") },
 	{ MODKEY,                       XK_Return, spawn,          {.v = termcmd } },
 	{ MODKEY,                       XK_j,      focusstack,     {.i = +1 } },
 	{ MODKEY,                       XK_k,      focusstack,     {.i = -1 } },

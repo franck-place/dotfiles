@@ -11,14 +11,15 @@ export XDG_DATA_DIRS="$HOME/.local/share/flatpak/exports/share:/var/lib/flatpak/
 # still reserves the same barheight strip of screen space for it.
 # NotificationStore.qml owns org.freedesktop.Notifications (dunst retired).
 #
-# A quickshell instance whose X11 connection dies (e.g. the previous session
-# was killed rather than exited cleanly) doesn't reliably exit on its own --
-# it keeps holding the single-instance lock, so the next session's launch
-# silently no-ops and the bar never appears. Force-kill any leftover instance
-# first; pkill rather than `quickshell kill` since that goes over the same
-# (possibly wedged) IPC socket the stale process isn't answering on.
-pkill -9 -f "qs -p .*/quickshell/dwmbar/shell\.qml" 2>/dev/null
-sleep 0.3
-qs -p ~/.config/quickshell/dwmbar/shell.qml &
+# Run as a systemd --user unit instead of a bare background job: systemd
+# restarts it on crash, and (unlike a plain `qs &`) `stop` reliably kills it
+# via its cgroup even if the process is wedged -- a stale `qs &` process
+# whose X11 connection died would otherwise linger holding the single-
+# instance lock, so the next session's bar would silently fail to appear.
+systemctl --user import-environment DISPLAY XAUTHORITY XDG_DATA_DIRS
+systemctl --user daemon-reload
+systemctl --user restart quickshell-dwmbar.service
 
-exec dwm
+dwm
+
+systemctl --user stop quickshell-dwmbar.service
