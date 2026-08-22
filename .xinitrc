@@ -20,6 +20,11 @@ systemctl --user import-environment DISPLAY XAUTHORITY XDG_DATA_DIRS
 systemctl --user daemon-reload
 systemctl --user restart quickshell-dwmbar.service
 
+# polkit auth agent -- without one, anything needing elevated privileges via
+# polkit (mounting drives, network config, etc.) fails with no prompt at all
+systemctl --user restart polkit-gnome.service
+
 dwm
 
 systemctl --user stop quickshell-dwmbar.service
+systemctl --user stop polkit-gnome.service

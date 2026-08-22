@@ -1,0 +1,12 @@
+[Unit]
+Description=PolicyKit Authentication Agent (GNOME)
+# Started/stopped explicitly from .xinitrc, same as quickshell-dwmbar.service --
+# there's no graphical-session.target here to hook into (dwm via startx, no
+# display manager), and the packaged .desktop autostart entry under
+# /etc/xdg/autostart never runs without a full XDG-autostart-capable session.
+
+[Service]
+Type=simple
+ExecStart=/usr/libexec/polkit-gnome-authentication-agent-1
+Restart=on-failure
+RestartSec=2
