@@ -165,7 +165,9 @@ PopupWindow {
                         hoverEnabled: true
                         onClicked: {
                             WallpaperState.hide();
-                            Quickshell.execDetached(["feh", "--bg-fill", cell.filePath]);
+                            // absolute path: quickshell's systemd --user PATH
+                            // doesn't include ~/.local/bin
+                            Quickshell.execDetached([Quickshell.env("HOME") + "/.local/bin/apply-theme", cell.filePath]);
                         }
                     }
                 }

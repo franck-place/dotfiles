@@ -1,4 +1,8 @@
 xrdb -merge ~/.Xresources
+# restores the last wallpaper-picked pywal palette (dwm/st read these via
+# their own xrdb/xresources patches at their own startup) instead of
+# falling back to their compiled-in defaults every fresh login
+[ -f ~/.cache/wal/colors.Xresources ] && xrdb -merge ~/.cache/wal/colors.Xresources
 [ -f ~/.fehbg ] && ~/.fehbg &
 picom --config ~/.config/picom.conf -b
 

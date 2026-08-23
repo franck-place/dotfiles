@@ -1,0 +1,31 @@
+#!/bin/sh
+# Regenerate the pywal palette from a wallpaper and push it live into
+# dwm (xrdb patch), st (xresources patch), and Quickshell (Theme.qml
+# watches ~/.cache/wal/colors.json directly, no action needed here).
+#
+# $1 = path to the wallpaper image. pywal sets the desktop wallpaper
+# itself (it drives feh), so nothing else here needs to touch it.
+set -e
+
+img="$1"
+[ -n "$img" ] || { echo "usage: apply-theme <image>" >&2; exit 1; }
+
+# Absolute path: this script is invoked by quickshell (systemd --user
+# unit), whose PATH is just /usr/local/{s,}bin:/usr/{s,}bin -- it doesn't
+# include ~/.local/bin, where pipx installs wal.
+#
+# colorthief backend: the default ImageMagick-based "wal" backend rejects
+# any image over 8000x8000px (system-wide IM policy at /etc/IM-7/policy.xml,
+# left untouched on purpose) -- several of the wallpapers here exceed that.
+#
+# -s: skip pywal's own terminal-sequence injection. Without it, wal writes
+# raw OSC escape codes (including OSC 708, a URxvt-only "border color"
+# extension) directly into every open /dev/pts/* device on every run --
+# that's what was actually crashing terminals, not the xrdb/SIGUSR1 path.
+# Already-open st windows get recolored through our own controlled
+# SIGUSR1 reload below instead; new ones read Xresources at their own
+# startup.
+"$HOME/.local/bin/wal" -i "$img" -q -s --backend colorthief
+xrdb -merge "$HOME/.cache/wal/colors.Xresources"
+pkill -USR1 -x st 2>/dev/null || true
+xdotool key --clearmodifiers super+F5
