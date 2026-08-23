@@ -17,6 +17,7 @@ Singleton {
     property var toasts: []   // live Notification objects
     property var history: []  // plain {app, summary, body, icon, de, time}
     property var rules: ({})  // lowercased app name -> "timed" | "persist"
+    property bool dndEnabled: false  // suppresses toasts only; history still records everything
 
     // minute tick so "Xm ago" labels re-evaluate
     readonly property date now: clock.date
@@ -113,7 +114,8 @@ Singleton {
             root.history = h.slice(0, root.historyLimit);
             root.save();
 
-            root.toasts = [n].concat(root.toasts);
+            if (!root.dndEnabled)
+                root.toasts = [n].concat(root.toasts);
             n.closed.connect(() => {
                 root.toasts = root.toasts.filter(t => t !== n);
             });

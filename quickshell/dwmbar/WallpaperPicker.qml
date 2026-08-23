@@ -5,58 +5,53 @@ import QtQuick
 
 // Wallpaper picker, replacing the sxiv-based wallpaper-select script.
 // Toggle from dwm's keybind via:
-//   qs -p ~/.config/quickshell/dwmbar ipc call wallpaper toggle
-PanelWindow {
+//   qs ipc -p ~/.config/quickshell/dwmbar call wallpaper toggle
+// Anchored to the bar like the other dropdowns (power/volume/notifications/
+// calendar) so it visually drops down out of it instead of floating as a
+// separate centered window; outside-click dismissal comes from ClickCatcher
+// via PopupGuard, same as those.
+PopupWindow {
     id: root
+
+    required property var bar
 
     readonly property string wallpapersDir: Quickshell.env("HOME") + "/Pictures/wallpapers"
     readonly property int cellW: 260
     readonly property int cellH: 160
     readonly property int gap: 12
     readonly property int columns: 4
+    readonly property int headerHeight: 22
+
+    // GridView lays cells out on a uniform (cellW+gap)/(cellH+gap) pitch,
+    // including a trailing gap after the last column/row -- so the view
+    // needs a full pitch per column/row, not (n-1) gaps, to actually fit
+    // `columns` across without wrapping early.
+    readonly property int cellPitchW: cellW + gap
+    readonly property int cellPitchH: cellH + gap
+    readonly property int maxVisibleRows: 3
+    readonly property int rows: Math.max(1, Math.ceil(folderModel.count / columns))
+    readonly property int visibleRows: Math.min(rows, maxVisibleRows)
+    readonly property int fullContentHeight: headerHeight + 38 + visibleRows * cellPitchH
+
+    anchor.window: root.bar
+    anchor.rect.x: Math.round((root.bar.width - implicitWidth) / 2)
+    anchor.rect.y: Theme.barHeight
 
     visible: false
-    focusable: true
-    aboveWindows: true
-    exclusionMode: ExclusionMode.Ignore
     color: "transparent"
 
-    // same rationale as Launcher.qml: dwm never focuses dock windows, so grab
-    // X input focus ourselves once mapped, and restore it on hide. The picker
-    // is the widest of our floating windows, so >1000px picks it out uniquely.
-    readonly property string grabFocusCmd:
-        "rd=${XDG_RUNTIME_DIR:-/tmp}; " +
-        "xdotool getwindowfocus > \"$rd/qs-wallpaper-prevfocus\" 2>/dev/null; " +
-        "qpid=$(pgrep -o -x qs); " +
-        "for i in $(seq 40); do " +
-        "for id in $(xdotool search --onlyvisible --pid \"$qpid\" 2>/dev/null); do " +
-        "eval \"$(xdotool getwindowgeometry --shell \"$id\")\"; " +
-        "if [ \"$WIDTH\" -gt 1000 ]; then xdotool windowfocus \"$id\"; exit 0; fi; " +
-        "done; sleep 0.05; done"
+    implicitWidth: columns * cellPitchW + 28
+    // dropdown motion: grows open from the bar instead of just popping in.
+    implicitHeight: visible ? fullContentHeight : 0
 
-    readonly property string restoreFocusCmd:
-        "rd=${XDG_RUNTIME_DIR:-/tmp}; " +
-        "[ -f \"$rd/qs-wallpaper-prevfocus\" ] && " +
-        "xdotool windowfocus \"$(cat \"$rd/qs-wallpaper-prevfocus\")\" 2>/dev/null"
-
-    onVisibleChanged: {
-        if (visible) {
-            grid.forceActiveFocus();
-            Quickshell.execDetached(["sh", "-c", grabFocusCmd]);
-        } else {
-            Quickshell.execDetached(["sh", "-c", restoreFocusCmd]);
-        }
+    Behavior on implicitHeight {
+        NumberAnimation { duration: 160; easing.type: Easing.OutQuad }
     }
 
-    anchors.top: true
-    margins.top: Math.round((screen.height - implicitHeight) / 2)
-
-    readonly property int rows: Math.max(1, Math.ceil(folderModel.count / columns))
-    implicitWidth: columns * cellW + (columns - 1) * gap + 28
-    implicitHeight: Math.min(screen.height * 0.8, headerRow.height + rows * cellH + (rows - 1) * gap + 28)
-
     function setShown(shown) {
-        visible = shown;
+        if (shown)
+            PopupGuard.claim(root);
+        root.visible = shown;
     }
 
     FolderListModel {
@@ -90,6 +85,7 @@ PanelWindow {
         color: Theme.popupBg
         border.color: Theme.popupBorder
         border.width: 1
+        clip: true
 
         Item {
             id: headerRow
@@ -97,7 +93,7 @@ PanelWindow {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.margins: 14
-            height: 22
+            height: root.headerHeight
 
             Text {
                 anchors.left: parent.left
@@ -131,14 +127,6 @@ PanelWindow {
             cellWidth: root.cellW + root.gap
             cellHeight: root.cellH + root.gap
             model: folderModel
-            focus: true
-
-            Keys.onPressed: event => {
-                if (event.key === Qt.Key_Escape) {
-                    root.setShown(false);
-                    event.accepted = true;
-                }
-            }
 
             delegate: Item {
                 id: cell
@@ -173,6 +161,26 @@ PanelWindow {
                         }
                     }
                 }
+            }
+        }
+
+        Rectangle {
+            id: scrollTrack
+            visible: grid.contentHeight > grid.height
+            anchors.top: grid.top
+            anchors.bottom: grid.bottom
+            anchors.right: parent.right
+            anchors.rightMargin: 6
+            width: 4
+            radius: 2
+            color: Theme.popupBorder
+
+            Rectangle {
+                width: parent.width
+                radius: 2
+                color: Theme.fgDim
+                y: grid.contentHeight > 0 ? (grid.contentY / grid.contentHeight) * scrollTrack.height : 0
+                height: grid.contentHeight > 0 ? Math.max(20, (grid.height / grid.contentHeight) * scrollTrack.height) : scrollTrack.height
             }
         }
     }

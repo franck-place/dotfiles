@@ -3,7 +3,7 @@ import Quickshell.Io
 import QtQuick
 
 // Application launcher, replacing dmenu. Toggled from dwm's keybind via:
-//   qs -p ~/.config/quickshell/dwmbar ipc call launcher toggle
+//   qs ipc -p ~/.config/quickshell/dwmbar call launcher toggle
 PanelWindow {
     id: root
 
@@ -154,6 +154,14 @@ PanelWindow {
         color: Theme.popupBg
         border.color: Theme.popupBorder
         border.width: 1
+
+        // dismiss on outside click: root grabbed X focus on open (see
+        // grabFocusCmd above), so clicking anywhere else -- another window,
+        // or the desktop -- moves X focus away and fires this.
+        Window.onActiveChanged: {
+            if (!Window.active && root.visible)
+                root.setShown(false);
+        }
 
         // Search bar
         Item {

@@ -68,8 +68,8 @@ static const char *termcmd[]  = { "st", NULL };
 
 static const Key keys[] = {
 	/* modifier                     key        function        argument */
-	{ MODKEY,                       XK_e,      spawn,          SHCMD("timeout 3 qs -p ~/.config/quickshell/dwmbar ipc call launcher toggle") },
-	{ MODKEY,                       XK_w,      spawn,          SHCMD("timeout 3 qs -p ~/.config/quickshell/dwmbar ipc call wallpaper toggle") },
+	{ MODKEY,                       XK_e,      spawn,          SHCMD("timeout 3 qs ipc -p ~/.config/quickshell/dwmbar call launcher toggle") },
+	{ MODKEY,                       XK_w,      spawn,          SHCMD("timeout 3 qs ipc -p ~/.config/quickshell/dwmbar call wallpaper toggle") },
 	{ MODKEY|ShiftMask,             XK_e,      spawn,          SHCMD("power-menu") },
 	{ 0,                            XK_Print,  spawn,          SHCMD("screenshot") },
 	{ ShiftMask,                    XK_Print,  spawn,          SHCMD("screenshot region") },

@@ -1,4 +1,5 @@
 import Quickshell
+import Quickshell.Io
 import QtQuick
 
 // Power icon in the bar; click opens a small dropdown instead of the old
@@ -16,6 +17,26 @@ Item {
         { label: "Shutdown", icon: "\u{f0425}", cmd: ["systemctl", "poweroff"] },
         { label: "Logout",   icon: "\u{f0343}", cmd: ["pkill", "-TERM", "-x", "dwm"] }
     ]
+
+    function setShown(shown) {
+        popup.visible = shown;
+    }
+
+    IpcHandler {
+        target: "power"
+
+        function toggle() {
+            pm.setShown(!popup.visible);
+        }
+
+        function show() {
+            pm.setShown(true);
+        }
+
+        function hide() {
+            pm.setShown(false);
+        }
+    }
 
     Rectangle {
         anchors.fill: parent

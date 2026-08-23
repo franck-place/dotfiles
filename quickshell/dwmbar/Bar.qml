@@ -41,13 +41,19 @@ PanelWindow {
             DwmState.key(combo);
     }
 
-    // ---- left: tags, layout, focused window title ----
+    // ---- left: settings, tags, layout, focused window title ----
     Row {
         id: leftRow
         anchors.left: parent.left
         anchors.leftMargin: 8
         anchors.verticalCenter: parent.verticalCenter
         spacing: 4
+
+        SettingsMenu {
+            anchors.verticalCenter: parent.verticalCenter
+        }
+
+        Item { width: 6; height: 1 }
 
         Repeater {
             model: 9
@@ -197,5 +203,9 @@ PanelWindow {
             anchors.verticalCenter: parent.verticalCenter
             bar: bar
         }
+    }
+
+    WallpaperPicker {
+        bar: bar
     }
 }

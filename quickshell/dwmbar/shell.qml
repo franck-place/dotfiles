@@ -9,7 +9,9 @@ ShellRoot {
 
     NotificationToasts {}
 
+    ClickCatcher {}
+
     Launcher {}
 
-    WallpaperPicker {}
+    SettingsWindow {}
 }

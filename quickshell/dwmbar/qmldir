@@ -10,3 +10,6 @@ NotificationToasts 1.0 NotificationToasts.qml
 PowerMenu 1.0 PowerMenu.qml
 Launcher 1.0 Launcher.qml
 WallpaperPicker 1.0 WallpaperPicker.qml
+SettingsMenu 1.0 SettingsMenu.qml
+SettingsWindow 1.0 SettingsWindow.qml
+ClickCatcher 1.0 ClickCatcher.qml
