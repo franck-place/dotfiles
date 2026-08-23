@@ -15,7 +15,14 @@ PanelWindow {
 
     readonly property var openPopup: PopupGuard.current
 
-    visible: root.openPopup !== null
+    // PopupGuard.current only ever changes on claim() (a new popup opening);
+    // nothing clears it back to null when a popup hides itself (hover
+    // timeout, picking a menu item, re-toggling the same icon off, or this
+    // window's own click below). Binding on openPopup.visible too, not just
+    // openPopup itself, means we stop covering the screen the instant the
+    // popup actually closes instead of staying mapped (and eating every
+    // click meant for a real window) until some other popup is claimed.
+    visible: root.openPopup !== null && root.openPopup.visible
     screen: root.openPopup ? root.openPopup.screen : Quickshell.screens[0]
     color: "transparent"
     exclusionMode: ExclusionMode.Ignore
