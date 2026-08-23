@@ -1,15 +1,14 @@
 import Quickshell
 import QtQuick
 
-// Full-screen, invisible click catcher for the small bar dropdowns (volume,
-// notifications, power, calendar) that go through PopupGuard. Those are
-// PopupWindows anchored near a bar icon and never grab X focus, so the
-// Window.active trick used by Launcher/WallpaperPicker/SettingsWindow
-// doesn't apply -- instead, whenever PopupGuard has an open popup, this
-// window covers everything below the bar and closes it on any click that
-// isn't on the popup itself. It's mapped (via the visible binding) before
-// the popup, and new windows stack on top, so the popup still renders above
-// it and remains clickable.
+// Full-screen, invisible click catcher for anything that isn't dismissed by
+// its own focus loss: the small bar dropdowns (volume, notifications,
+// power, calendar, wallpaper), which go through PopupGuard/WallpaperState
+// and never grab X focus. Whenever one is open, this window covers
+// everything below the bar and closes it on any click that isn't on it.
+// It's mapped (via the visible binding) before a PopupGuard popup, and new
+// windows stack on top, so the popup still renders above it and remains
+// clickable.
 PanelWindow {
     id: root
 
@@ -22,7 +21,7 @@ PanelWindow {
     // openPopup itself, means we stop covering the screen the instant the
     // popup actually closes instead of staying mapped (and eating every
     // click meant for a real window) until some other popup is claimed.
-    visible: root.openPopup !== null && root.openPopup.visible
+    visible: (root.openPopup !== null && root.openPopup.visible) || WallpaperState.open
     screen: root.openPopup ? root.openPopup.screen : Quickshell.screens[0]
     color: "transparent"
     exclusionMode: ExclusionMode.Ignore
@@ -41,6 +40,8 @@ PanelWindow {
         onClicked: {
             if (root.openPopup)
                 root.openPopup.visible = false;
+            if (WallpaperState.open)
+                WallpaperState.hide();
         }
     }
 }

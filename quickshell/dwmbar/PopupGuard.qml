@@ -12,6 +12,12 @@ Singleton {
     property var pending: null
 
     function claim(p) {
+        // the wallpaper picker isn't tracked here (it doesn't unmap/remap on
+        // open like these do, so swapping it via the pending-hide dance
+        // below would fight its own close animation) -- just courtesy-close
+        // it whenever a real popup is claimed instead.
+        WallpaperState.hide();
+
         if (current === p)
             return;
         if (pending && pending !== p)

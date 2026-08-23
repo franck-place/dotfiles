@@ -1,91 +1,99 @@
 import Quickshell
 import Quickshell.Io
-import Qt.labs.folderlistmodel
 import QtQuick
 
-// Wallpaper picker, replacing the sxiv-based wallpaper-select script.
-// Toggle from dwm's keybind via:
-//   qs ipc -p ~/.config/quickshell/dwmbar call wallpaper toggle
-// Anchored to the bar like the other dropdowns (power/volume/notifications/
-// calendar) so it visually drops down out of it instead of floating as a
-// separate centered window; outside-click dismissal comes from ClickCatcher
-// via PopupGuard, same as those.
+// Wallpaper picker: a small window anchored flush under the bar, spanning
+// only its own column -- not the whole bar-width strip, and not a floating
+// popup panel either (no border/radius, exact bar background color) -- so
+// it reads as a small part of the bar dropping down, not a menu.
+//
+// The window itself maps at its final size immediately; "growing open" is
+// a clipped reveal animation of the content *inside* it, not a live resize
+// of the actual window. Animating a real X11 top-level window's geometry
+// every frame (as this used to do, briefly, as part of the whole bar) is
+// inherently choppy -- each step is a real ConfigureWindow round-trip plus
+// a GLX surface reallocation. A fixed-size window with an animated clip
+// mask is pure GPU-composited scene-graph work instead.
 PopupWindow {
     id: root
 
     required property var bar
 
-    readonly property string wallpapersDir: Quickshell.env("HOME") + "/Pictures/wallpapers"
-    readonly property int cellW: 260
-    readonly property int cellH: 160
-    readonly property int gap: 12
-    readonly property int columns: 4
-    readonly property int headerHeight: 22
-
-    // GridView lays cells out on a uniform (cellW+gap)/(cellH+gap) pitch,
-    // including a trailing gap after the last column/row -- so the view
-    // needs a full pitch per column/row, not (n-1) gaps, to actually fit
-    // `columns` across without wrapping early.
-    readonly property int cellPitchW: cellW + gap
-    readonly property int cellPitchH: cellH + gap
-    readonly property int maxVisibleRows: 3
-    readonly property int rows: Math.max(1, Math.ceil(folderModel.count / columns))
-    readonly property int visibleRows: Math.min(rows, maxVisibleRows)
-    readonly property int fullContentHeight: headerHeight + 38 + visibleRows * cellPitchH
-
     anchor.window: root.bar
-    anchor.rect.x: Math.round((root.bar.width - implicitWidth) / 2)
+    anchor.rect.x: Math.round((root.bar.width - WallpaperState.panelWidth) / 2)
     anchor.rect.y: Theme.barHeight
 
-    visible: false
+    implicitWidth: WallpaperState.panelWidth
+    implicitHeight: WallpaperState.contentHeight
+
+    // ClickCatcher also reacts to WallpaperState.open, directly and
+    // synchronously -- if this window's own visible did too, both windows
+    // would request mapping in the same instant with no guaranteed order,
+    // and whichever X happened to stack on top would eat every click
+    // (matching exactly what selecting a wallpaper looked like: the click
+    // never reached the grid's own MouseArea, so it just closed like an
+    // outside click). Mapping this window a beat after ClickCatcher
+    // guarantees it stacks above it instead, the same way PopupGuard's own
+    // popups stay reliably on top of it.
+    property bool mapped: false
+    visible: mapped || closeTimer.running
     color: "transparent"
 
-    implicitWidth: columns * cellPitchW + 28
-    // dropdown motion: grows open from the bar instead of just popping in.
-    implicitHeight: visible ? fullContentHeight : 0
-
-    Behavior on implicitHeight {
-        NumberAnimation { duration: 160; easing.type: Easing.OutQuad }
+    Connections {
+        target: WallpaperState
+        function onOpenChanged() {
+            if (WallpaperState.open) {
+                if (PopupGuard.current)
+                    PopupGuard.current.visible = false;
+                openTimer.restart();
+            } else {
+                root.mapped = false;
+                closeTimer.restart();
+            }
+        }
     }
 
-    function setShown(shown) {
-        if (shown)
-            PopupGuard.claim(root);
-        root.visible = shown;
+    Timer {
+        id: openTimer
+        interval: 20
+        onTriggered: root.mapped = true
     }
 
-    FolderListModel {
-        id: folderModel
-        folder: "file://" + root.wallpapersDir
-        nameFilters: ["*.jpg", "*.jpeg", "*.png"]
-        showDirs: false
-        sortField: FolderListModel.Name
+    // keeps the window mapped for exactly as long as the reveal mask takes
+    // to collapse back to 0, so the close reads as a motion instead of a pop.
+    Timer {
+        id: closeTimer
+        interval: 170
     }
 
     IpcHandler {
         target: "wallpaper"
 
-        function toggle() {
-            root.setShown(!root.visible);
-        }
-
-        function show() {
-            root.setShown(true);
-        }
-
-        function hide() {
-            root.setShown(false);
-        }
+        function toggle() { WallpaperState.toggle(); }
+        function show() { WallpaperState.show(); }
+        function hide() { WallpaperState.hide(); }
     }
 
     Rectangle {
-        id: panel
-        anchors.fill: parent
-        radius: 14
-        color: Theme.popupBg
-        border.color: Theme.popupBorder
-        border.width: 1
+        id: revealMask
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: WallpaperState.open ? WallpaperState.contentHeight : 0
         clip: true
+
+        // square where it meets the bar (flush, no seam), rounded only at
+        // the bottom -- same opacity/color as the bar itself since this is
+        // meant to read as the bar's own surface, not a separate panel.
+        color: Theme.barBg
+        topLeftRadius: 0
+        topRightRadius: 0
+        bottomLeftRadius: 14
+        bottomRightRadius: 14
+
+        Behavior on height {
+            NumberAnimation { duration: 160; easing.type: Easing.OutQuad }
+        }
 
         Item {
             id: headerRow
@@ -93,7 +101,7 @@ PopupWindow {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.margins: 14
-            height: root.headerHeight
+            height: WallpaperState.headerHeight
 
             Text {
                 anchors.left: parent.left
@@ -108,7 +116,7 @@ PopupWindow {
             Text {
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
-                text: folderModel.count + " image" + (folderModel.count === 1 ? "" : "s")
+                text: WallpaperState.folderModel.count + " image" + (WallpaperState.folderModel.count === 1 ? "" : "s")
                 color: Theme.fgDim
                 font.family: Theme.fontFamily
                 font.pixelSize: 11
@@ -124,16 +132,16 @@ PopupWindow {
             anchors.bottom: parent.bottom
             anchors.margins: 14
             clip: true
-            cellWidth: root.cellW + root.gap
-            cellHeight: root.cellH + root.gap
-            model: folderModel
+            cellWidth: WallpaperState.cellW + WallpaperState.gap
+            cellHeight: WallpaperState.cellH + WallpaperState.gap
+            model: WallpaperState.folderModel
 
             delegate: Item {
                 id: cell
                 required property string filePath
 
-                width: grid.cellWidth - root.gap
-                height: grid.cellHeight - root.gap
+                width: grid.cellWidth - WallpaperState.gap
+                height: grid.cellHeight - WallpaperState.gap
 
                 Rectangle {
                     anchors.fill: parent
@@ -156,7 +164,7 @@ PopupWindow {
                         anchors.fill: parent
                         hoverEnabled: true
                         onClicked: {
-                            root.setShown(false);
+                            WallpaperState.hide();
                             Quickshell.execDetached(["feh", "--bg-fill", cell.filePath]);
                         }
                     }
