@@ -19,12 +19,13 @@ PanelWindow {
     exclusionMode: ExclusionMode.Ignore
     color: "transparent"
 
-    property string currentView: "main"   // main | network | notifications | display | mouse | theme
+    property string currentView: "main"   // main | network | notifications | display | mouse | power | theme
     readonly property var viewTitles: ({
         network: "Network",
         notifications: "Notifications",
         display: "Display",
         mouse: "Mouse",
+        power: "Power",
         theme: "Theme"
     })
 
@@ -73,6 +74,7 @@ PanelWindow {
         uptimeFile.reload();
         refreshDisplay();
         refreshMouse();
+        refreshPower();
         refreshTheme();
     }
 
@@ -319,6 +321,93 @@ PanelWindow {
         const script =
             "xinput list | grep -i 'slave  pointer' | grep -oE 'id=[0-9]+' | cut -d= -f2 | " +
             "while read -r id; do xinput set-prop \"$id\" 'libinput Natural Scrolling Enabled' " + (on ? "1" : "0") + " 2>/dev/null; done";
+        Quickshell.execDetached(["sh", "-c", script]);
+    }
+
+    // ==================== power ====================
+
+    // no settings file of its own: DPMS timeout is read back from `xset
+    // q` and the suspend timeout from whatever -time argument the
+    // idle-suspend.service unit is currently running with -- same
+    // "the running state is the config" philosophy as the sections
+    // above.
+    readonly property var timeoutOptions: [1, 5, 10, 15, 30, 60]
+    property int dpmsTimeoutMin: 0    // 0 == Never/disabled
+    property int suspendTimeoutMin: 0 // 0 == Never/not running
+
+    function timeoutLabel(min) {
+        return min <= 0 ? "Never" : (min + " min");
+    }
+
+    function labelToTimeout(label) {
+        return label === "Never" ? 0 : parseInt(label, 10);
+    }
+
+    function refreshPower() {
+        dpmsQueryProc.running = true;
+        xautolockQueryProc.running = true;
+    }
+
+    Process {
+        id: dpmsQueryProc
+        command: ["xset", "q"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (/DPMS is Disabled/.test(text)) {
+                    root.dpmsTimeoutMin = 0;
+                    return;
+                }
+                const m = text.match(/Off:\s*(\d+)/);
+                root.dpmsTimeoutMin = m ? Math.round(parseInt(m[1], 10) / 60) : 0;
+            }
+        }
+    }
+
+    Process {
+        id: xautolockQueryProc
+        command: ["pgrep", "-a", "-x", "xautolock"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const m = text.match(/-time\s+(\d+)/);
+                root.suspendTimeoutMin = m ? parseInt(m[1], 10) : 0;
+            }
+        }
+    }
+
+    function setDpmsTimeout(min) {
+        root.dpmsTimeoutMin = min;
+        if (min <= 0) {
+            Quickshell.execDetached(["sh", "-c", "xset s off; xset -dpms"]);
+        } else {
+            const secs = min * 60;
+            Quickshell.execDetached(["sh", "-c", `xset +dpms; xset dpms ${secs} ${secs} ${secs}; xset s ${secs}`]);
+        }
+    }
+
+    readonly property string idleSuspendUnitPath: Quickshell.env("HOME") + "/.config/systemd/user/idle-suspend.service"
+
+    function setSuspendTimeout(min) {
+        root.suspendTimeoutMin = min;
+        if (min <= 0) {
+            Quickshell.execDetached(["sh", "-c", "systemctl --user stop idle-suspend.service 2>/dev/null; systemctl --user disable idle-suspend.service 2>/dev/null"]);
+            return;
+        }
+        const unit =
+            "[Unit]\n" +
+            "Description=Suspend after idle (xautolock)\n\n" +
+            "[Service]\n" +
+            "Type=simple\n" +
+            `ExecStart=/usr/bin/xautolock -time ${min} -locker "systemctl suspend"\n` +
+            "Restart=on-failure\n" +
+            "RestartSec=2\n" +
+            "KillMode=process\n\n" +
+            "[Install]\n" +
+            "WantedBy=default.target\n";
+        const script =
+            `mkdir -p "$(dirname "${root.idleSuspendUnitPath}")"; ` +
+            `cat > "${root.idleSuspendUnitPath}" << 'EOF'\n${unit}EOF\n` +
+            "systemctl --user daemon-reload; " +
+            "systemctl --user enable --now idle-suspend.service";
         Quickshell.execDetached(["sh", "-c", script]);
     }
 
@@ -782,6 +871,13 @@ PanelWindow {
                     }
 
                     CategoryRow {
+                        iconGlyph: "\u{f0425}"
+                        label: "Power"
+                        subtitle: "Screen off " + root.timeoutLabel(root.dpmsTimeoutMin) + " · Suspend " + root.timeoutLabel(root.suspendTimeoutMin)
+                        onClicked: root.currentView = "power"
+                    }
+
+                    CategoryRow {
                         iconGlyph: "\u{f03d8}"
                         label: "Theme"
                         subtitle: root.currentGtkTheme || "—"
@@ -1178,6 +1274,36 @@ PanelWindow {
                             checked: root.naturalScroll
                             onToggled: root.setNaturalScroll(!checked)
                         }
+                    }
+                }
+
+                // ==================== power sub-view ====================
+                Column {
+                    width: parent.width
+                    spacing: 10
+                    visible: root.currentView === "power"
+
+                    SectionLabel { text: "SCREEN OFF" }
+                    Dropdown {
+                        items: root.timeoutOptions.map(root.timeoutLabel).concat(["Never"])
+                        current: root.timeoutLabel(root.dpmsTimeoutMin)
+                        onPicked: label => root.setDpmsTimeout(root.labelToTimeout(label))
+                    }
+
+                    SectionLabel { text: "SUSPEND AFTER" }
+                    Dropdown {
+                        items: root.timeoutOptions.map(root.timeoutLabel).concat(["Never"])
+                        current: root.timeoutLabel(root.suspendTimeoutMin)
+                        onPicked: label => root.setSuspendTimeout(root.labelToTimeout(label))
+                    }
+
+                    Text {
+                        text: "Suspend needs xautolock installed (sudo zypper install xautolock)."
+                        color: Theme.fgDim
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 10
+                        wrapMode: Text.Wrap
+                        width: parent.width
                     }
                 }
 

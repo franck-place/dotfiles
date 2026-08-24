@@ -4,6 +4,7 @@
 #include <string.h>
 #include <X11/Xlib.h>
 #include <X11/Xft/Xft.h>
+#include <X11/Xcursor/Xcursor.h>
 
 #include "drw.h"
 #include "util.h"
@@ -456,6 +457,21 @@ drw_cur_create(Drw *drw, int shape)
 		return NULL;
 
 	cur->cursor = XCreateFontCursor(drw->dpy, shape);
+
+	return cur;
+}
+
+Cur *
+drw_cur_create_themed(Drw *drw, const char *name, int fallback_shape)
+{
+	Cur *cur;
+
+	if (!drw || !(cur = ecalloc(1, sizeof(Cur))))
+		return NULL;
+
+	cur->cursor = XcursorLibraryLoadCursor(drw->dpy, name);
+	if (!cur->cursor)
+		cur->cursor = XCreateFontCursor(drw->dpy, fallback_shape);
 
 	return cur;
 }

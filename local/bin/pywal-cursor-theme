@@ -1,0 +1,156 @@
+#!/home/franck/.local/share/pipx/venvs/pywal16/bin/python3
+"""Regenerate ~/.icons/pywal from whiteglass, recolored to the current
+pywal palette (colors.color4, the same accent slot everything else in
+this rice maps to).
+
+Xcursor is a plain, well-documented binary format (magic + a table of
+contents of image chunks, each just width/height/hotspot/delay + raw
+premultiplied-ARGB32 pixels) -- no library needed to read it. Writing it
+back out goes through xcursorgen instead of a hand-rolled writer: it
+already knows how to premultiply straight-alpha PNGs correctly, so this
+script only has to produce PNGs and a config file.
+
+Called from ~/.local/bin/apply-theme after the picom step. Not meant to
+be run with arguments; reads the wallpaper picker's own output directly.
+"""
+import colorsys
+import json
+import os
+import shutil
+import struct
+import subprocess
+import sys
+from pathlib import Path
+
+from PIL import Image
+
+SRC = Path("/usr/share/icons/whiteglass/cursors")
+DST = Path.home() / ".icons" / "pywal"
+COLORS_JSON = Path.home() / ".cache" / "wal" / "colors.json"
+
+IMAGE_TYPE = 0xFFFD0002
+
+
+def read_xcursor(path):
+    data = path.read_bytes()
+    magic, header, version, ntoc = struct.unpack_from("<4sIII", data, 0)
+    if magic != b"Xcur":
+        raise ValueError(f"not an Xcursor file: {path}")
+
+    toc = []
+    off = header
+    for _ in range(ntoc):
+        typ, subtype, position = struct.unpack_from("<III", data, off)
+        toc.append((typ, subtype, position))
+        off += 12
+
+    images = []
+    for typ, subtype, position in toc:
+        if typ != IMAGE_TYPE:
+            continue
+        (chdr, ctype, csubtype, cver, width, height, xhot, yhot, delay) = \
+            struct.unpack_from("<IIIIIIIII", data, position)
+        pixel_off = position + chdr
+        npix = width * height
+        pixels = struct.unpack_from(f"<{npix}I", data, pixel_off)
+        images.append({
+            "size": subtype, "width": width, "height": height,
+            "xhot": xhot, "yhot": yhot, "delay": delay, "pixels": pixels,
+        })
+    return images
+
+
+def recolor_image(img, target_h, target_s):
+    """Straight-alpha RGBA bytes, hue/sat replaced, lightness preserved."""
+    out = bytearray(img["width"] * img["height"] * 4)
+    for i, argb in enumerate(img["pixels"]):
+        a = (argb >> 24) & 0xFF
+        r = (argb >> 16) & 0xFF
+        g = (argb >> 8) & 0xFF
+        b = argb & 0xFF
+
+        if a == 0:
+            nr, ng, nb = 0, 0, 0
+        else:
+            af = a / 255.0
+            rf = min(1.0, (r / 255.0) / af)
+            gf = min(1.0, (g / 255.0) / af)
+            bf = min(1.0, (b / 255.0) / af)
+            _, l, s = colorsys.rgb_to_hls(rf, gf, bf)
+            # fully desaturated (grayscale) source pixels get the target
+            # hue/sat wholesale -- whiteglass is grayscale almost
+            # everywhere, this is what actually makes the cursor "colored"
+            nr, ng, nb = colorsys.hls_to_rgb(target_h, l, target_s)
+            nr, ng, nb = (max(0, min(255, round(c * 255))) for c in (nr, ng, nb))
+
+        out[i * 4 + 0] = nr
+        out[i * 4 + 1] = ng
+        out[i * 4 + 2] = nb
+        out[i * 4 + 3] = a
+    return bytes(out)
+
+
+def build_cursor(name, images, target_h, target_s, workdir):
+    config_lines = []
+    for idx, img in enumerate(images):
+        png_path = workdir / f"{name}.{img['size']}.{idx}.png"
+        pixels = recolor_image(img, target_h, target_s)
+        Image.frombytes("RGBA", (img["width"], img["height"]), pixels).save(png_path)
+        delay = f" {img['delay']}" if img["delay"] else ""
+        config_lines.append(f"{img['size']} {img['xhot']} {img['yhot']} {png_path}{delay}")
+
+    config_path = workdir / f"{name}.cfg"
+    config_path.write_text("\n".join(config_lines) + "\n")
+
+    out_path = DST / "cursors" / name
+    subprocess.run(["xcursorgen", str(config_path), str(out_path)], check=True)
+
+
+def main():
+    if not COLORS_JSON.exists():
+        print("no pywal colors yet -- run wal first", file=sys.stderr)
+        return 1
+
+    colors = json.loads(COLORS_JSON.read_text())
+    accent = colors["colors"]["color4"].lstrip("#")
+    r, g, b = (int(accent[i:i + 2], 16) / 255.0 for i in (0, 2, 4))
+    target_h, _, target_s = colorsys.rgb_to_hls(r, g, b)
+    target_s = min(0.6, max(target_s, 0.35))
+
+    cursors_dir = DST / "cursors"
+    if cursors_dir.exists():
+        shutil.rmtree(cursors_dir)
+    cursors_dir.mkdir(parents=True)
+
+    workdir = Path("/tmp") / f"pywal-cursor-build-{os.getpid()}"
+    workdir.mkdir(parents=True, exist_ok=True)
+    try:
+        # is_file() follows symlinks (true for a symlink pointing at a
+        # regular file too), so it has to be excluded explicitly here or
+        # every symlink gets double-counted as a real file as well.
+        real_files = [p for p in SRC.iterdir() if p.is_file() and not p.is_symlink()]
+        symlinks = [p for p in SRC.iterdir() if p.is_symlink()]
+
+        for path in real_files:
+            images = read_xcursor(path)
+            if not images:
+                continue
+            build_cursor(path.name, images, target_h, target_s, workdir)
+
+        for link in symlinks:
+            target = os.readlink(link)
+            (cursors_dir / link.name).symlink_to(target)
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
+
+    (DST / "index.theme").write_text(
+        "[Icon Theme]\n"
+        "Name=pywal\n"
+        "Comment=Regenerated from the active wallpaper's palette\n"
+        "Inherits=whiteglass\n"
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

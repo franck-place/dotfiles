@@ -36,3 +36,9 @@ xdotool key --clearmodifiers super+F5
 bg=$(jq -r '.special.background' "$HOME/.cache/wal/colors.json")
 sed -i "s/^shadow-color = .*/shadow-color = \"$bg\";/" "$HOME/.config/picom.conf"
 pkill -USR1 -x picom 2>/dev/null || true
+
+# Regenerates ~/.icons/pywal in place from the same palette. Only affects
+# apps once "pywal" is picked as the active cursor theme (Settings ->
+# Theme -> Cursor Theme) -- this just keeps that theme's files current,
+# it doesn't select it.
+"$HOME/.local/bin/pywal-cursor-theme"

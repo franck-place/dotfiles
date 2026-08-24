@@ -46,6 +46,10 @@ void drw_scm_free(Drw *drw, Clr *scm, size_t clrcount);
 
 /* Cursor abstraction */
 Cur *drw_cur_create(Drw *drw, int shape);
+/* tries the named cursor from the active Xcursor theme (Xcursor.theme X
+ * resource -- set by the wallpaper picker's pywal pipeline) first, falls
+ * back to the plain core font cursor if that comes up empty */
+Cur *drw_cur_create_themed(Drw *drw, const char *name, int fallback_shape);
 void drw_cur_free(Drw *drw, Cur *cursor);
 
 /* Drawing context manipulation */

@@ -2021,8 +2021,11 @@ setup(void)
 	xatom[Manager] = XInternAtom(dpy, "MANAGER", False);
 	xatom[Xembed] = XInternAtom(dpy, "_XEMBED", False);
 	xatom[XembedInfo] = XInternAtom(dpy, "_XEMBED_INFO", False);
-	/* init cursors */
-	cursor[CurNormal] = drw_cur_create(drw, XC_left_ptr);
+	/* init cursors -- CurNormal tries the active Xcursor theme (the
+	 * wallpaper picker's pywal-recolored one, once picked in Settings)
+	 * first; CurResize/CurMove stay plain core cursors since they're
+	 * only ever shown transiently mid-drag */
+	cursor[CurNormal] = drw_cur_create_themed(drw, "left_ptr", XC_left_ptr);
 	cursor[CurResize] = drw_cur_create(drw, XC_sizing);
 	cursor[CurMove] = drw_cur_create(drw, XC_fleur);
 	/* init appearance */
@@ -2839,10 +2842,22 @@ systraytomon(Monitor *m) {
 void
 xrdb(const Arg *arg)
 {
-	loadxrdb();
+	Monitor *m;
 	int i;
+
+	loadxrdb();
 	for (i = 0; i < LENGTH(colors); i++)
 		scheme[i] = drw_scm_create(drw, colors[i], 3);
+
+	/* CurNormal is only ever created once in setup() otherwise -- redo
+	 * it here too so the pointer actually follows Xcursor.theme on
+	 * every reload instead of just once at dwm's own startup */
+	drw_cur_free(drw, cursor[CurNormal]);
+	cursor[CurNormal] = drw_cur_create_themed(drw, "left_ptr", XC_left_ptr);
+	XDefineCursor(dpy, root, cursor[CurNormal]->cursor);
+	for (m = mons; m; m = m->next)
+		XDefineCursor(dpy, m->barwin, cursor[CurNormal]->cursor);
+
 	focus(NULL);
 	arrange(NULL);
 }
