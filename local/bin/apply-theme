@@ -29,3 +29,10 @@ img="$1"
 xrdb -merge "$HOME/.cache/wal/colors.Xresources"
 pkill -USR1 -x st 2>/dev/null || true
 xdotool key --clearmodifiers super+F5
+
+# picom isn't pywal-templated (it's a static conf, not rendered from
+# {colorN} placeholders) -- patch its shadow-color line in place and
+# SIGUSR1 to hot-reload without restarting the compositor.
+bg=$(jq -r '.special.background' "$HOME/.cache/wal/colors.json")
+sed -i "s/^shadow-color = .*/shadow-color = \"$bg\";/" "$HOME/.config/picom.conf"
+pkill -USR1 -x picom 2>/dev/null || true

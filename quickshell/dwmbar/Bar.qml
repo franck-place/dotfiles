@@ -53,7 +53,12 @@ PanelWindow {
             anchors.verticalCenter: parent.verticalCenter
         }
 
-        Item { width: 6; height: 1 }
+        Rectangle {
+            width: 1
+            height: 16
+            anchors.verticalCenter: parent.verticalCenter
+            color: Theme.popupBorder
+        }
 
         Repeater {
             model: 9
@@ -149,6 +154,20 @@ PanelWindow {
         anchors.verticalCenter: parent.verticalCenter
         spacing: 6
 
+        MediaWidget {
+            id: mediaWidget
+            anchors.verticalCenter: parent.verticalCenter
+            bar: bar
+        }
+
+        Rectangle {
+            width: 1
+            height: 16
+            anchors.verticalCenter: parent.verticalCenter
+            color: Theme.popupBorder
+            visible: mediaWidget.visible
+        }
+
         Repeater {
             model: SystemTray.items
 
@@ -187,7 +206,13 @@ PanelWindow {
             }
         }
 
-        Item { width: 4; height: 1; visible: SystemTray.items.length > 0 }
+        Rectangle {
+            width: 1
+            height: 16
+            anchors.verticalCenter: parent.verticalCenter
+            color: Theme.popupBorder
+            visible: SystemTray.items.values.length > 0
+        }
 
         VolumeWidget {
             anchors.verticalCenter: parent.verticalCenter

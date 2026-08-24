@@ -4,6 +4,7 @@ singleton PopupGuard 1.0 PopupGuard.qml
 singleton NotificationStore 1.0 NotificationStore.qml
 singleton WallpaperState 1.0 WallpaperState.qml
 Bar 1.0 Bar.qml
+MediaWidget 1.0 MediaWidget.qml
 VolumeWidget 1.0 VolumeWidget.qml
 ClockWidget 1.0 ClockWidget.qml
 NotificationCenter 1.0 NotificationCenter.qml

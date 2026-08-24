@@ -9,3 +9,12 @@ Type=simple
 ExecStart=/usr/bin/qs -p %h/.config/quickshell/dwmbar/shell.qml
 Restart=on-failure
 RestartSec=2
+# default KillMode (control-group) kills every process still sitting in
+# this unit's cgroup on stop/restart -- not just qs itself. Apps launched
+# from the quickshell Launcher (Launcher.qml's DesktopEntry.execute())
+# stay in that same cgroup, since nothing reparents them elsewhere, so a
+# plain `systemctl restart` here was silently killing everything launched
+# through it. `process` still lets systemd escalate SIGTERM->SIGKILL on
+# qs itself if it's wedged -- it just stops that from cascading to
+# unrelated children.
+KillMode=process
