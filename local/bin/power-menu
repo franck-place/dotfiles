@@ -1,0 +1,24 @@
+#!/bin/sh
+# dmenu power menu, themed to match dwm. dmenu takes colors as plain
+# flags (no Xresources support in vanilla suckless dmenu), so read the
+# live palette straight from wal's own colors.json each run instead of
+# hardcoding a fixed theme -- same role mapping as everywhere else:
+# background/foreground = special.*, accent = color4, selected fg =
+# background (matches dwm's selfgcolor/st's cursorColorReverse).
+colors="$HOME/.cache/wal/colors.json"
+nb=$(jq -r '.special.background' "$colors" 2>/dev/null)
+nf=$(jq -r '.special.foreground' "$colors" 2>/dev/null)
+sb=$(jq -r '.colors.color4' "$colors" 2>/dev/null)
+sf="$nb"
+[ -n "$nb" ] || { nb="#1c1714"; nf="#c9b79c"; sb="#b5651d"; sf="#f2e8d5"; }
+
+choice=$(printf 'Shutdown\nRestart\nLogout\nCancel\n' \
+	| dmenu -i -p "power:" -fn "JetBrains Mono:size=11" \
+		-nb "$nb" -nf "$nf" -sb "$sb" -sf "$sf")
+
+case "$choice" in
+	Shutdown) systemctl poweroff ;;
+	Restart)  systemctl reboot ;;
+	Logout)   pkill -TERM -x dwm ;;
+	*) ;;
+esac

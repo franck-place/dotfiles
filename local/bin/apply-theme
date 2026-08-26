@@ -32,10 +32,25 @@ xrdb -merge "$HOME/.cache/wal/colors.Xresources"
 pkill -USR1 -x st 2>/dev/null || true
 xdotool key --clearmodifiers super+F5
 
+# One jq call for every palette field the rest of this script needs
+# (picom's shadow-color, Qt's color scheme, and the luminance/accent
+# maths below) -- avoids re-invoking jq, and re-parsing colors.json off
+# disk, six separate times for six single fields.
+palette=$(jq -r '.special.background, .special.foreground, .colors.color0, .colors.color4, .colors.color7, .colors.color8' "$HOME/.cache/wal/colors.json")
+IFS='
+'
+set -- $palette
+unset IFS
+bg=$1
+fg=$2
+c0=$3
+c4=$4
+c7=$5
+c8=$6
+
 # picom isn't pywal-templated (it's a static conf, not rendered from
 # {colorN} placeholders) -- patch its shadow-color line in place and
 # SIGUSR1 to hot-reload without restarting the compositor.
-bg=$(jq -r '.special.background' "$HOME/.cache/wal/colors.json")
 sed -i "s/^shadow-color = .*/shadow-color = \"$bg\";/" "$HOME/.config/picom.conf"
 pkill -USR1 -x picom 2>/dev/null || true
 
@@ -53,11 +68,6 @@ pkill -USR1 -x picom 2>/dev/null || true
 # HighlightedText, Link, LinkVisited, AlternateBase, (unused), ToolTipBase,
 # ToolTipText, PlaceholderText.
 argb() { printf '#ff%s' "$(printf '%s' "$1" | tr -d '#')"; }
-fg=$(jq -r '.special.foreground' "$HOME/.cache/wal/colors.json")
-c0=$(jq -r '.colors.color0' "$HOME/.cache/wal/colors.json")
-c4=$(jq -r '.colors.color4' "$HOME/.cache/wal/colors.json")
-c7=$(jq -r '.colors.color7' "$HOME/.cache/wal/colors.json")
-c8=$(jq -r '.colors.color8' "$HOME/.cache/wal/colors.json")
 BG=$(argb "$bg"); FG=$(argb "$fg"); C0=$(argb "$c0"); C4=$(argb "$c4"); C7=$(argb "$c7"); C8=$(argb "$c8")
 cat > "$HOME/.cache/wal/qt-colorscheme.conf" << EOF
 [ColorScheme]

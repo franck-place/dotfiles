@@ -2846,8 +2846,10 @@ xrdb(const Arg *arg)
 	int i;
 
 	loadxrdb();
-	for (i = 0; i < LENGTH(colors); i++)
+	for (i = 0; i < LENGTH(colors); i++) {
+		drw_scm_free(drw, scheme[i], 3);
 		scheme[i] = drw_scm_create(drw, colors[i], 3);
+	}
 
 	/* CurNormal is only ever created once in setup() otherwise -- redo
 	 * it here too so the pointer actually follows Xcursor.theme on
