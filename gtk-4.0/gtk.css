@@ -1,0 +1,12 @@
+/* GTK4 always loads this file regardless of theme (no on-disk theme
+ * mechanism like GTK3's), so it's the one fixed lever available here --
+ * set once and never edited again. The actual @define-color overrides
+ * live in the pywal-templated companion file this imports, regenerated
+ * on every wallpaper change (see that file's own header comment for
+ * what is/isn't verified to actually work).
+ *
+ * The real, documented lever for actual libadwaita apps is
+ * org.gnome.desktop.interface color-scheme + accent-color, both driven
+ * from the palette directly in apply-theme -- this file is a best-effort
+ * layer underneath that for classic (non-libadwaita) GTK4 widgets. */
+@import url("file:///home/franck/.cache/wal/gtk-colors.css");

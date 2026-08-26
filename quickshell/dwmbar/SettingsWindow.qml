@@ -246,6 +246,7 @@ PanelWindow {
             return;
         Quickshell.execDetached(["xrandr", "--output", root.displayOutput, "--mode", res, "--rate", rate]);
         modeRefreshDelay.restart();
+        root.saveState();
     }
 
     function pickResolution(res) {
@@ -273,6 +274,7 @@ PanelWindow {
         root.brightness = Math.max(root.brightnessMin, Math.min(root.brightnessMax, v));
         if (root.displayOutput)
             Quickshell.execDetached(["xrandr", "--output", root.displayOutput, "--brightness", root.brightness.toFixed(2)]);
+        root.saveState();
     }
 
     // ==================== mouse ====================
@@ -314,6 +316,7 @@ PanelWindow {
     function setAccelSpeed(v) {
         root.accelSpeed = Math.max(root.accelMin, Math.min(root.accelMax, v));
         Quickshell.execDetached(["xset", "m", String(root.accelSpeed), "4"]);
+        root.saveState();
     }
 
     function setNaturalScroll(on) {
@@ -322,6 +325,7 @@ PanelWindow {
             "xinput list | grep -i 'slave  pointer' | grep -oE 'id=[0-9]+' | cut -d= -f2 | " +
             "while read -r id; do xinput set-prop \"$id\" 'libinput Natural Scrolling Enabled' " + (on ? "1" : "0") + " 2>/dev/null; done";
         Quickshell.execDetached(["sh", "-c", script]);
+        root.saveState();
     }
 
     // ==================== power ====================
@@ -382,6 +386,7 @@ PanelWindow {
             const secs = min * 60;
             Quickshell.execDetached(["sh", "-c", `xset +dpms; xset dpms ${secs} ${secs} ${secs}; xset s ${secs}`]);
         }
+        root.saveState();
     }
 
     readonly property string idleSuspendUnitPath: Quickshell.env("HOME") + "/.config/systemd/user/idle-suspend.service"
@@ -409,6 +414,82 @@ PanelWindow {
             "systemctl --user daemon-reload; " +
             "systemctl --user enable --now idle-suspend.service";
         Quickshell.execDetached(["sh", "-c", script]);
+    }
+
+    // ==================== persisted state ====================
+
+    // xrandr/xset/xinput have no persistence of their own -- every value
+    // they hold lives only in the current X session and reverts to the
+    // driver/server default on every login. Idle-suspend and the theme
+    // pickers don't need this (systemd enable / gsettings+dconf already
+    // survive reboot), but display/mouse/DPMS do, so every setter above
+    // re-saves this file, and it's replayed once here at Quickshell
+    // startup (this window is created eagerly in shell.qml, so this
+    // FileView loads well before anyone opens Settings) -- same
+    // load/save-JSON shape as NotificationStore.qml's history file.
+    readonly property string stateStorePath: Quickshell.shellPath("settings-state.json")
+
+    function saveState() {
+        stateStore.setText(JSON.stringify({
+            displayOutput: root.displayOutput,
+            displayRes: root.selectedRes,
+            displayRate: root.selectedRate,
+            brightness: root.brightness,
+            accelSpeed: root.accelSpeed,
+            naturalScroll: root.naturalScroll,
+            dpmsTimeoutMin: root.dpmsTimeoutMin
+        }, null, 2));
+    }
+
+    // Applies effects directly instead of calling setAccelSpeed()/
+    // setNaturalScroll()/setDpmsTimeout() -- those each call saveState()
+    // themselves, and doing that mid-sequence here would re-write the
+    // file with only a partially-applied state (e.g. the display fields
+    // wiped back to "" before they'd been applied at all). Also bypasses
+    // applyMode()/root.displayOutput, which isn't populated yet this
+    // early (refreshDisplay() hasn't run) -- targets the saved output
+    // name directly instead.
+    function applySavedState(s) {
+        if (s.accelSpeed !== undefined) {
+            root.accelSpeed = s.accelSpeed;
+            Quickshell.execDetached(["xset", "m", String(s.accelSpeed), "4"]);
+        }
+        if (s.naturalScroll !== undefined) {
+            root.naturalScroll = s.naturalScroll;
+            const script =
+                "xinput list | grep -i 'slave  pointer' | grep -oE 'id=[0-9]+' | cut -d= -f2 | " +
+                "while read -r id; do xinput set-prop \"$id\" 'libinput Natural Scrolling Enabled' " + (s.naturalScroll ? "1" : "0") + " 2>/dev/null; done";
+            Quickshell.execDetached(["sh", "-c", script]);
+        }
+        if (s.dpmsTimeoutMin !== undefined) {
+            root.dpmsTimeoutMin = s.dpmsTimeoutMin;
+            if (s.dpmsTimeoutMin <= 0) {
+                Quickshell.execDetached(["sh", "-c", "xset s off; xset -dpms"]);
+            } else {
+                const secs = s.dpmsTimeoutMin * 60;
+                Quickshell.execDetached(["sh", "-c", `xset +dpms; xset dpms ${secs} ${secs} ${secs}; xset s ${secs}`]);
+            }
+        }
+        if (s.displayOutput && s.displayRes && s.displayRate) {
+            root.selectedRes = s.displayRes;
+            root.selectedRate = s.displayRate;
+            if (s.brightness !== undefined)
+                root.brightness = s.brightness;
+            Quickshell.execDetached(["xrandr", "--output", s.displayOutput, "--mode", s.displayRes, "--rate", s.displayRate]);
+            if (s.brightness)
+                Quickshell.execDetached(["xrandr", "--output", s.displayOutput, "--brightness", String(s.brightness)]);
+        }
+    }
+
+    FileView {
+        id: stateStore
+        path: root.stateStorePath
+        onLoaded: {
+            try {
+                root.applySavedState(JSON.parse(text()));
+            } catch (e) {}
+        }
+        onLoadFailed: {} // first run: nothing saved yet, keep the built-in defaults
     }
 
     // ==================== theme ====================
@@ -471,9 +552,26 @@ PanelWindow {
         applyTheme("gtk-theme", "gtk-theme-name", name);
     }
 
+    readonly property var qtConfigPaths: [
+        Quickshell.env("HOME") + "/.config/qt5ct/qt5ct.conf",
+        Quickshell.env("HOME") + "/.config/qt6ct/qt6ct.conf"
+    ]
+
     function setIconTheme(name) {
         root.currentIconTheme = name;
         applyTheme("icon-theme", "gtk-icon-theme-name", name);
+        // GTK3/4 pick this up via the gsettings write above (GtkSettings
+        // is gsettings-backed), but Qt has no such bridge -- qt5ct/qt6ct
+        // only ever read their own conf file, so it needs writing
+        // directly here too.
+        for (const path of root.qtConfigPaths) {
+            const script =
+                "f='" + path + "'; " +
+                "if grep -q '^icon_theme=' \"$f\" 2>/dev/null; then " +
+                "sed -i 's|^icon_theme=.*|icon_theme=" + name + "|' \"$f\"; " +
+                "else printf '%s\\n' 'icon_theme=" + name + "' >> \"$f\"; fi";
+            Quickshell.execDetached(["sh", "-c", script]);
+        }
     }
 
     function setCursorTheme(name) {
@@ -1122,7 +1220,7 @@ PanelWindow {
                         ToggleSwitch {
                             anchors.verticalCenter: parent.verticalCenter
                             checked: NotificationStore.dndEnabled
-                            onToggled: NotificationStore.dndEnabled = !checked
+                            onToggled: NotificationStore.toggleDnd()
                         }
                     }
                 }

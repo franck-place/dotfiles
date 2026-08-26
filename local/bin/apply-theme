@@ -1,7 +1,9 @@
 #!/bin/sh
 # Regenerate the pywal palette from a wallpaper and push it live into
-# dwm (xrdb patch), st (xresources patch), and Quickshell (Theme.qml
-# watches ~/.cache/wal/colors.json directly, no action needed here).
+# dwm (xrdb patch), st (xresources patch), Quickshell (Theme.qml watches
+# ~/.cache/wal/colors.json directly, no action needed here), picom
+# (shadow-color), GTK4 (mostly template-driven, see ~/.config/gtk-4.0/
+# gtk.css, plus a libadwaita accent-color step below), and Qt/qt5ct+qt6ct.
 #
 # $1 = path to the wallpaper image. pywal sets the desktop wallpaper
 # itself (it drives feh), so nothing else here needs to touch it.
@@ -37,8 +39,69 @@ bg=$(jq -r '.special.background' "$HOME/.cache/wal/colors.json")
 sed -i "s/^shadow-color = .*/shadow-color = \"$bg\";/" "$HOME/.config/picom.conf"
 pkill -USR1 -x picom 2>/dev/null || true
 
-# Regenerates ~/.icons/pywal in place from the same palette. Only affects
-# apps once "pywal" is picked as the active cursor theme (Settings ->
-# Theme -> Cursor Theme) -- this just keeps that theme's files current,
-# it doesn't select it.
-"$HOME/.local/bin/pywal-cursor-theme"
+# Qt (qt5ct/qt6ct) color scheme: also not expressible via a plain wal
+# template -- {background} etc. render as bare "#rrggbb", but qt5ct's
+# colors.conf format needs "#aarrggbb" (alpha-prefixed), a transform
+# wal's {placeholder} substitution can't do -- so build it directly here,
+# the same way picom's shadow-color line is patched above. Both
+# ~/.config/qt5ct/qt5ct.conf and qt6ct.conf point at this one generated
+# path already (set once, not regenerated); only its contents change.
+# Field order verified against this system's own /usr/share/qt6ct/colors/
+# schemes (21 comma-separated ARGB values under active/inactive/
+# disabled_colors): WindowText, Button, Light, Midlight, Dark, Mid, Text,
+# BrightText, ButtonText, Base, Window, Shadow, Highlight,
+# HighlightedText, Link, LinkVisited, AlternateBase, (unused), ToolTipBase,
+# ToolTipText, PlaceholderText.
+argb() { printf '#ff%s' "$(printf '%s' "$1" | tr -d '#')"; }
+fg=$(jq -r '.special.foreground' "$HOME/.cache/wal/colors.json")
+c0=$(jq -r '.colors.color0' "$HOME/.cache/wal/colors.json")
+c4=$(jq -r '.colors.color4' "$HOME/.cache/wal/colors.json")
+c7=$(jq -r '.colors.color7' "$HOME/.cache/wal/colors.json")
+c8=$(jq -r '.colors.color8' "$HOME/.cache/wal/colors.json")
+BG=$(argb "$bg"); FG=$(argb "$fg"); C0=$(argb "$c0"); C4=$(argb "$c4"); C7=$(argb "$c7"); C8=$(argb "$c8")
+cat > "$HOME/.cache/wal/qt-colorscheme.conf" << EOF
+[ColorScheme]
+active_colors=$FG, $C8, $C7, $C8, $C0, $C0, $FG, $FG, $FG, $BG, $BG, $C0, $C4, $BG, $C4, $C4, $BG, $BG, $BG, $FG, $C8
+inactive_colors=$C8, $BG, $C8, $C8, $C0, $C0, $C8, $FG, $C8, $BG, $BG, $C0, $C8, $C8, $C8, $C8, $BG, $BG, $BG, $FG, $C8
+disabled_colors=$C8, $BG, $C8, $C8, $C0, $C0, $C8, $FG, $C8, $BG, $BG, $C0, $BG, $C8, $C8, $C8, $BG, $BG, $BG, $FG, $C8
+EOF
+
+# GTK4/libadwaita's real, documented theming lever (GNOME 47+): a
+# dark/light color-scheme switch plus one of a fixed 9-value accent-color
+# enum (blue/teal/green/yellow/orange/red/pink/purple/slate) -- not
+# arbitrary hex. gtk-colors.css above covers classic GTK4 widgets that
+# don't use libadwaita's own styling; this covers the rest as well as
+# it can:
+#   - color-scheme from the background's relative luminance (so a light
+#     wallpaper palette doesn't end up forced dark)
+#   - accent-color snapped to the closest of the 9 presets by Euclidean
+#     RGB distance against libadwaita's own reference hexes
+#     (css-variables.html)
+scheme=$(awk -v bg="$bg" '
+BEGIN {
+    r = strtonum("0x" substr(bg, 2, 2)) / 255
+    g = strtonum("0x" substr(bg, 4, 2)) / 255
+    b = strtonum("0x" substr(bg, 6, 2)) / 255
+    lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
+    print (lum < 0.5) ? "prefer-dark" : "prefer-light"
+}')
+gsettings set org.gnome.desktop.interface color-scheme "$scheme"
+
+gnome_accent=$(awk -v target="$c4" '
+BEGIN {
+    split("blue teal green yellow orange red pink purple slate", names, " ")
+    split("3584e4 2190a4 3a944a c88800 ed5b00 e62d42 d56199 9141ac 6f8396", hexes, " ")
+    tr = strtonum("0x" substr(target, 2, 2))
+    tg = strtonum("0x" substr(target, 4, 2))
+    tb = strtonum("0x" substr(target, 6, 2))
+    bestd = -1
+    for (i = 1; i <= 9; i++) {
+        r = strtonum("0x" substr(hexes[i], 1, 2))
+        g = strtonum("0x" substr(hexes[i], 3, 2))
+        b = strtonum("0x" substr(hexes[i], 5, 2))
+        d = (r - tr)^2 + (g - tg)^2 + (b - tb)^2
+        if (bestd < 0 || d < bestd) { bestd = d; best = names[i] }
+    }
+    print best
+}')
+gsettings set org.gnome.desktop.interface accent-color "$gnome_accent"

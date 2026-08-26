@@ -30,19 +30,3 @@ dwm.normbordercolor:   {color8}
 dwm.selbgcolor:        {color4}
 dwm.selbordercolor:    {color4}
 dwm.selfgcolor:        {background}
-
-! not palette-derived -- just announces the theme name so dwm's
-! XcursorLibraryLoadCursor() and any Xcursor-aware app picks it up.
-! ~/.local/bin/pywal-cursor-theme regenerates that theme's actual files
-! from the same palette. Fixed name, always merged -- harmless even
-! before the theme's ever been picked in Settings, since libXcursor just
-! falls back to its own default if "pywal" isn't installed yet.
-!
-! Xcursor.size matters just as much: without it, apps that resolve the
-! cursor straight from Xresources (bypassing gsettings entirely, which
-! is most non-GTK X11/Xcursor consumers) fell back to whatever size
-! they felt like -- ended up picking a 64px variant from this theme
-! instead of a normal ~24px one. Matches gsettings' own default
-! (org.gnome.desktop.interface cursor-size) so both paths agree.
-Xcursor.theme: pywal
-Xcursor.size: 24

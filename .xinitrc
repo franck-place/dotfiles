@@ -10,6 +10,13 @@ picom --config ~/.config/picom.conf -b
 # default outside a full desktop session, so the launcher wouldn't see them
 export XDG_DATA_DIRS="$HOME/.local/share/flatpak/exports/share:/var/lib/flatpak/exports/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
 
+# qt6ct's platform-theme plugin also registers under the name "qt5ct"
+# (confirmed via `strings` on both libqt5ct.so and libqt6ct.so -- each
+# lists both keys), so this one value themes both Qt5 and Qt6 apps: icon
+# theme + the pywal-driven color scheme set up in ~/.config/qt5ct/
+# qt5ct.conf and qt6ct.conf.
+export QT_QPA_PLATFORMTHEME=qt6ct
+
 # Quickshell bar: tags/layout/title/clock/volume/tray/power -- the only bar.
 # dwm's own bar is fully disabled (showbar=0, showsystray=0 in config.h) but
 # still reserves the same barheight strip of screen space for it.
@@ -20,7 +27,7 @@ export XDG_DATA_DIRS="$HOME/.local/share/flatpak/exports/share:/var/lib/flatpak/
 # via its cgroup even if the process is wedged -- a stale `qs &` process
 # whose X11 connection died would otherwise linger holding the single-
 # instance lock, so the next session's bar would silently fail to appear.
-systemctl --user import-environment DISPLAY XAUTHORITY XDG_DATA_DIRS
+systemctl --user import-environment DISPLAY XAUTHORITY XDG_DATA_DIRS QT_QPA_PLATFORMTHEME
 systemctl --user daemon-reload
 systemctl --user restart quickshell-dwmbar.service
 

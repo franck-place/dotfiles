@@ -33,6 +33,11 @@ Singleton {
         return rules[(appName || "Unknown").toLowerCase()] || "timed";
     }
 
+    function toggleDnd() {
+        dndEnabled = !dndEnabled;
+        save();
+    }
+
     function toggleMode(appName) {
         const r = JSON.parse(JSON.stringify(rules));
         const k = (appName || "Unknown").toLowerCase();
@@ -89,7 +94,7 @@ Singleton {
     }
 
     function save() {
-        store.setText(JSON.stringify({ rules: rules, history: history }, null, 2));
+        store.setText(JSON.stringify({ rules: rules, history: history, dndEnabled: dndEnabled }, null, 2));
     }
 
     NotificationServer {
@@ -132,6 +137,8 @@ Singleton {
                     root.rules = d.rules;
                 if (d.history)
                     root.history = d.history;
+                if (d.dndEnabled !== undefined)
+                    root.dndEnabled = d.dndEnabled;
             } catch (e) {}
         }
         onLoadFailed: root.save() // first run: create the file
