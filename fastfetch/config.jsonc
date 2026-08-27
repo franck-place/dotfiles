@@ -1,58 +1,47 @@
-{
-  "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/master/doc/json_schema.json",
-  // Deliberate role mapping instead of fastfetch's own defaults. These
-  // are full 2-digit SGR codes (34 = set-foreground-blue, 90 = set-
-  // foreground-bright-black, 39 = default-foreground) -- fastfetch
-  // parses a bare single digit as a literal SGR *attribute* instead
-  // (4 = underline, 7 = reverse, 8 = conceal), which is not what we
-  // want here. SGR foreground codes resolve through st's
-  // colorname[0-7]/dc.col[], like everything else in this rice, so
-  // this needs no regeneration step when the palette changes. Same
-  // roles used elsewhere: 34 = accent (colorname[4]), 90 = dim
-  // (colorname[8]).
-  "logo": {
-    "color": {
-      "1": "34",
-      "2": "39"
-    }
-  },
-  "display": {
-    "color": {
-      "keys": "90",
-      "title": "34",
-      "output": "39",
-      "separator": "90"
-    }
-  },
-  "modules": [
-    "title",
-    "separator",
-    "os",
-    "host",
-    "kernel",
-    "uptime",
-    "packages",
-    "shell",
-    "display",
-    "de",
-    "wm",
-    "wmtheme",
-    "theme",
-    "icons",
-    "font",
-    "cursor",
-    "terminal",
-    "terminalfont",
-    "cpu",
-    "gpu",
-    "memory",
-    "swap",
-    "disk",
-    "localip",
-    "battery",
-    "poweradapter",
-    "locale",
-    "break",
-    "colors"
-  ]
+{ 
+    "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
+    "logo": {
+        "source": "suse", // search for logos: fastfetch --list-logos or --print-logos
+        "padding": {
+	        "top": 1
+	},
+    },
+    "display": {
+        "separator": "  "
+    },
+    "modules": [
+	"break",
+        {
+            "type": "os",
+            "key": "OS  ",
+            "keyColor": "36",  // = color1
+        },
+        {
+            "type": "kernel",
+            "key": "KERNEL ",
+            "keyColor": "36",
+        },
+        {
+            "type": "packages",
+            "format": "{rpm} (rpm)",
+            "key": "PACKAGES ",
+            "keyColor": "36",  
+        },
+        {
+            "type": "shell",
+            "key": "SHELL  ",
+            "keyColor": "36", 
+        },
+        {
+            "type": "terminal",
+            "key": "TERMINAL ",
+            "keyColor": "36", 
+        },
+        {
+            "type": "wm",
+            "key": "WM  ",
+            "keyColor": "36", 
+        },
+        "break",
+    ]
 }

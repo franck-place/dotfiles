@@ -1,0 +1,20 @@
+# Sourced by ~/.bashrc. Plain aliases only -- anything palette-aware
+# (LS_COLORS, the prompt, less/man colors) lives in .bashrc itself since
+# it needs the SGR-code comments explaining the role mapping.
+
+alias ls='ls --color=auto'
+alias ll='ls -lh --color=auto'
+alias la='ls -lAh --color=auto'
+alias grep='grep --color=auto'
+alias egrep='egrep --color=auto'
+alias fgrep='fgrep --color=auto'
+
+alias ..='cd ..'
+alias ...='cd ../..'
+
+alias df='df -h'
+alias du='du -h'
+alias free='free -h'
+
+# Display images inline via st's kitty-graphics-protocol patch.
+alias icat='sh "$HOME/.local/src/st-0.9/icat-mini.sh"'
